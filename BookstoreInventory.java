@@ -1,0 +1,291 @@
+package lib;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
+import javax.swing.table.TableColumnModel;
+import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class BookstoreInventory extends JFrame {
+    private JTable table;
+    private DefaultTableModel model;
+    private LinkedList books;
+
+    private boolean isTitleAscending = true;
+    private boolean isAuthorAscending = true;
+    private boolean isPriceAscending = true;
+    private boolean isStockAscending = true;
+
+    // Constructor to initialize the bookstore inventory
+    public BookstoreInventory() {
+        books = new LinkedList();
+        initComponents();
+    }
+
+    @SuppressWarnings("serial")
+    private void initComponents() {
+        setTitle("Bookstore Inventory");  // Set the title of the frame
+        setSize(800, 600);  // Set the size of the frame
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);  // Set the default close operation
+        setLocationRelativeTo(null);  // Center the frame
+
+        JPanel panel = new JPanel(new BorderLayout());  // Create a panel with BorderLayout
+        getContentPane().add(panel);
+
+        String[] columnNames = {"Title", "Author", "Price", "Stock"};
+        model = new DefaultTableModel(columnNames, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;  // Make cells non-editable
+            }
+        };
+        table = new JTable(model);  // Create a JTable with the model
+        table.getTableHeader().setReorderingAllowed(false);  // Disable column reordering
+        panel.add(new JScrollPane(table), BorderLayout.CENTER);  // Add the table to the panel
+
+        addTableHeaderMouseListener();  // Add mouse listener to the table header
+
+        JPanel bottomPanel = new JPanel();  // Create a panel for buttons
+        panel.add(bottomPanel, BorderLayout.SOUTH);
+
+        // Add buttons to the bottom panel
+        JButton addButton = new JButton("Add Book");
+        bottomPanel.add(addButton);
+
+        JButton searchButton = new JButton("Search");
+        bottomPanel.add(searchButton);
+
+        JButton updateStockButton = new JButton("Update Stock");
+        bottomPanel.add(updateStockButton);
+
+        JButton markDiscontinuedButton = new JButton("Mark as Discontinued");
+        bottomPanel.add(markDiscontinuedButton);
+
+        // Add action listeners to the buttons
+        addButton.addActionListener(e -> addBook());
+        searchButton.addActionListener(e -> searchBook());
+        updateStockButton.addActionListener(e -> updateStock());
+        markDiscontinuedButton.addActionListener(e -> markAsDiscontinued());
+
+        refreshTable();  // Refresh the table to show initial data
+    }
+
+    // Method to add mouse listener to the table header for sorting
+    private void addTableHeaderMouseListener() {
+        JTableHeader header = table.getTableHeader();
+        header.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int col = table.columnAtPoint(e.getPoint());
+                String columnName = table.getColumnName(col);
+
+                switch (columnName) {
+                    case "Title":
+                        sortBooks("title");
+                        break;
+                    case "Author":
+                        sortBooks("author");
+                        break;
+                    case "Price":
+                        sortBooks("price");
+                        break;
+                    case "Stock":
+                        sortBooks("stock");
+                        break;
+                }
+            }
+        });
+    }
+
+    // Method to sort books based on the specified criteria
+    private void sortBooks(String criteria) {
+        List<Book> bookList = books.toList().stream()
+                .filter(book -> !book.isDiscontinued())
+                .collect(Collectors.toList());
+
+        switch (criteria) {
+            case "title":
+                bookList.sort(isTitleAscending ? Comparator.comparing(Book::getTitle, String.CASE_INSENSITIVE_ORDER)
+                        : Comparator.comparing(Book::getTitle, String.CASE_INSENSITIVE_ORDER).reversed());
+                isTitleAscending = !isTitleAscending;
+                break;
+            case "author":
+                bookList.sort(isAuthorAscending ? Comparator.comparing(Book::getAuthor, String.CASE_INSENSITIVE_ORDER)
+                        : Comparator.comparing(Book::getAuthor, String.CASE_INSENSITIVE_ORDER).reversed());
+                isAuthorAscending = !isAuthorAscending;
+                break;
+            case "price":
+                bookList.sort(isPriceAscending ? Comparator.comparingDouble(Book::getPrice)
+                        : Comparator.comparingDouble(Book::getPrice).reversed());
+                isPriceAscending = !isPriceAscending;
+                break;
+            case "stock":
+                bookList.sort(isStockAscending ? Comparator.comparingInt(Book::getStock)
+                        : Comparator.comparingInt(Book::getStock).reversed());
+                isStockAscending = !isStockAscending;
+                break;
+        }
+
+        updateTable(bookList);  // Update the table with sorted data
+        updateTableHeaderIcons();  // Update the table header icons
+    }
+
+    // Method to update table header icons based on sorting order
+    private void updateTableHeaderIcons() {
+        JTableHeader header = table.getTableHeader();
+        TableColumnModel columnModel = header.getColumnModel();
+
+        for (int i = 0; i < columnModel.getColumnCount(); i++) {
+            String columnName = columnModel.getColumn(i).getHeaderValue().toString().split(" ")[0];
+            String icon = "";
+
+            switch (columnName) {
+                case "Title":
+                    icon = isTitleAscending ? " \u25B2" : " \u25BC";
+                    break;
+                case "Author":
+                    icon = isAuthorAscending ? " \u25B2" : " \u25BC";
+                    break;
+                case "Price":
+                    icon = isPriceAscending ? " \u25B2" : " \u25BC";
+                    break;
+                case "Stock":
+                    icon = isStockAscending ? " \u25B2" : " \u25BC";
+                    break;
+            }
+            columnModel.getColumn(i).setHeaderValue(columnName + icon);
+        }
+
+        header.repaint();  // Repaint the header to show updated icons
+    }
+
+    // Method to add a new book to the inventory
+    private void addBook() {
+        String title = JOptionPane.showInputDialog(this, "Enter book title:");
+        if (title == null || title.trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Title cannot be empty.");
+            return;
+        }
+
+        String author = JOptionPane.showInputDialog(this, "Enter book author:");
+        if (author == null || author.trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Author cannot be empty.");
+            return;
+        }
+
+        // Check if the book already exists
+        if (books.toList().stream().anyMatch(b -> b.getTitle().equalsIgnoreCase(title) && b.getAuthor().equalsIgnoreCase(author))) {
+            JOptionPane.showMessageDialog(this, "This book with the same title and author already exists.");
+            return;
+        }
+
+        double price = -1;
+        while (price < 0) {
+            try {
+                String priceInput = JOptionPane.showInputDialog(this, "Enter book price (numbers only):");
+                if (priceInput == null) return;
+                price = Double.parseDouble(priceInput);
+                if (price < 0) throw new NumberFormatException();
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(this, "Invalid input. Please enter a non-negative number for price.");
+            }
+        }
+
+        int stock = -1;
+        while (stock < 0) {
+            try {
+                String stockInput = JOptionPane.showInputDialog(this, "Enter stock quantity (non-negative integer only):");
+                if (stockInput == null) return;
+                stock = Integer.parseInt(stockInput);
+                if (stock < 0) throw new NumberFormatException();
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(this, "Invalid input. Please enter a non-negative integer for stock.");
+            }
+        }
+
+        books.add(new Book(title, author, price, stock));  // Add the new book to the list
+        refreshTable();  // Refresh the table to show the updated list
+    }
+
+    // Method to search for a book by title or author
+    private void searchBook() {
+        String query = JOptionPane.showInputDialog(this, "Enter title or author to search:");
+        if (query == null || query.trim().isEmpty()) {
+            refreshTable();
+            return;
+        }
+
+        List<Book> filteredBooks = books.toList().stream()
+                .filter(book -> (book.getTitle().equalsIgnoreCase(query) || book.getAuthor().equalsIgnoreCase(query)) && !book.isDiscontinued())
+                .collect(Collectors.toList());
+
+        if (filteredBooks.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Book not found.");
+        } else {
+            updateTable(filteredBooks);  // Update the table to show the search results
+        }
+    }
+
+    // Method to update the stock of a book
+    private void updateStock() {
+        String title = JOptionPane.showInputDialog(this, "Enter book title to update stock:");
+        Book book = books.find(title);
+
+        if (book != null && !book.isDiscontinued()) {
+            try {
+                int newStock = Integer.parseInt(JOptionPane.showInputDialog(this, "Enter new stock quantity (non-negative numbers only):"));
+                if (newStock >= 0) {
+                    book.setStock(newStock);
+                    refreshTable();
+                } else {
+                    JOptionPane.showMessageDialog(this, "Invalid input. Stock must be a non-negative number.");
+                }
+            } catch (NumberFormatException e) {
+                JOptionPane.showMessageDialog(this, "Invalid input. Please enter a valid number for stock.");
+            }
+        } else {
+            JOptionPane.showMessageDialog(this, "Book not found!");
+        }
+    }
+
+
+    // Method to mark a book as discontinued
+    private void markAsDiscontinued() {
+        String title = JOptionPane.showInputDialog(this, "Enter book title to mark as discontinued:");
+        Book book = books.find(title);
+
+        if (book != null) {
+            book.setDiscontinued(true);  // Mark the book as discontinued
+            refreshTable();  // Refresh the table to show the updated status
+        } else {
+            JOptionPane.showMessageDialog(this, "Book not found!");
+        }
+    }
+
+    // Method to refresh the table with active books
+    private void refreshTable() {
+        List<Book> activeBooks = books.toList().stream()
+                .filter(book -> !book.isDiscontinued())
+                .collect(Collectors.toList());
+        updateTable(activeBooks);  // Update the table with active books
+    }
+
+    // Method to update the table with a list of books
+    private void updateTable(List<Book> books) {
+        model.setRowCount(0);  // Clear the table
+        for (Book book : books) {
+            model.addRow(new Object[]{book.getTitle(), book.getAuthor(), String.format("%.2f", book.getPrice()), book.getStock()});
+        }
+    }
+
+    // Main method to run the bookstore inventory application
+    public static void main(String[] args) {
+        new BookstoreInventory().setVisible(true);  // Create and display the application
+    }
+}
+
