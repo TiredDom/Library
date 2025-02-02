@@ -1,6 +1,7 @@
 package lib;
 import java.util.List;
 import java.util.ArrayList;
+
 class LinkedList {
     private Node head;
     private int size;
@@ -67,5 +68,11 @@ class LinkedList {
 
     public int size() {
         return size;
+    }
+
+    // Clear all elements from the linked list
+    public void clear() {
+        head = null;
+        size = 0;
     }
 }

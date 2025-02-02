@@ -7,72 +7,121 @@ import javax.swing.table.TableColumnModel;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.*;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 public class BookstoreInventory extends JFrame {
     private JTable table;
     private DefaultTableModel model;
     private LinkedList books;
+    private static final String FILE_NAME = "books.json";
+    private static final Gson gson = new Gson();
 
     private boolean isTitleAscending = true;
     private boolean isAuthorAscending = true;
     private boolean isPriceAscending = true;
     private boolean isStockAscending = true;
+    
+    
 
     // Constructor to initialize the bookstore inventory
     public BookstoreInventory() {
+    	ImageIcon appIcon = new ImageIcon(getClass().getClassLoader().getResource("resources/Group_2_Logo.ico"));
+        setIconImage(appIcon.getImage());  // Set the application icon
         books = new LinkedList();
+        loadBooksFromFile(); // Load saved books from file
         initComponents();
     }
 
-    @SuppressWarnings("serial")
-    private void initComponents() {
-        setTitle("Bookstore Inventory");  // Set the title of the frame
-        setSize(800, 600);  // Set the size of the frame
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);  // Set the default close operation
-        setLocationRelativeTo(null);  // Center the frame
+    // Save the list of books to a JSON file
+    private void saveBooksToFile() {
+        try (Writer writer = new FileWriter(FILE_NAME)) {
+            gson.toJson(books.toList(), writer);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
-        JPanel panel = new JPanel(new BorderLayout());  // Create a panel with BorderLayout
+    // Load books from the JSON file
+    private void loadBooksFromFile() {
+        try (Reader reader = new FileReader(FILE_NAME)) {
+            List<Book> loadedBooks = gson.fromJson(reader, new TypeToken<List<Book>>() {}.getType());
+            if (loadedBooks != null) {
+                books.clear();
+                for (Book book : loadedBooks) {
+                    books.add(book);
+                }
+            }
+        } catch (FileNotFoundException e) {
+            System.out.println("No previous data found. Starting fresh.");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Initialize UI components
+    private void initComponents() {
+        setTitle("Bookstore Inventory");
+        setSize(800, 600);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        JPanel panel = new JPanel(new BorderLayout());
         getContentPane().add(panel);
 
+        // Table setup
         String[] columnNames = {"Title", "Author", "Price", "Stock"};
         model = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return false;  // Make cells non-editable
+                return false;
             }
         };
-        table = new JTable(model);  // Create a JTable with the model
-        table.getTableHeader().setReorderingAllowed(false);  // Disable column reordering
-        panel.add(new JScrollPane(table), BorderLayout.CENTER);  // Add the table to the panel
+        table = new JTable(model);
+        table.getTableHeader().setReorderingAllowed(false);
+        panel.add(new JScrollPane(table), BorderLayout.CENTER);
 
-        addTableHeaderMouseListener();  // Add mouse listener to the table header
+        addTableHeaderMouseListener();
 
-        JPanel bottomPanel = new JPanel();  // Create a panel for buttons
+        JPanel bottomPanel = new JPanel();
         panel.add(bottomPanel, BorderLayout.SOUTH);
 
-        // Add buttons to the bottom panel
+        // Add buttons for functionality
         JButton addButton = new JButton("Add Book");
         bottomPanel.add(addButton);
+        addButton.addActionListener(e -> {
+            addBook();
+            saveBooksToFile();
+        });
 
         JButton searchButton = new JButton("Search");
         bottomPanel.add(searchButton);
+        searchButton.addActionListener(e -> searchBook());
 
         JButton updateStockButton = new JButton("Update Stock");
         bottomPanel.add(updateStockButton);
+        updateStockButton.addActionListener(e -> {
+            updateStock();
+            saveBooksToFile();
+        });
 
         JButton markDiscontinuedButton = new JButton("Mark as Discontinued");
         bottomPanel.add(markDiscontinuedButton);
+        markDiscontinuedButton.addActionListener(e -> {
+            markAsDiscontinued();
+            saveBooksToFile();
+        });
+        
+        JButton resetButton = new JButton("Reset Inventory");
+        bottomPanel.add(resetButton);
+        resetButton.addActionListener(e -> resetInventory());
 
-        // Add action listeners to the buttons
-        addButton.addActionListener(e -> addBook());
-        searchButton.addActionListener(e -> searchBook());
-        updateStockButton.addActionListener(e -> updateStock());
-        markDiscontinuedButton.addActionListener(e -> markAsDiscontinued());
 
-        refreshTable();  // Refresh the table to show initial data
+        refreshTable();
     }
 
     // Method to add mouse listener to the table header for sorting
@@ -101,8 +150,7 @@ public class BookstoreInventory extends JFrame {
             }
         });
     }
-
-    // Method to sort books based on the specified criteria
+    
     private void sortBooks(String criteria) {
         List<Book> bookList = books.toList().stream()
                 .filter(book -> !book.isDiscontinued())
@@ -131,11 +179,12 @@ public class BookstoreInventory extends JFrame {
                 break;
         }
 
-        updateTable(bookList);  // Update the table with sorted data
-        updateTableHeaderIcons();  // Update the table header icons
+        // After sorting, update the table
+        updateTable(bookList);  // Call this to refresh the table with the sorted list
+        updateTableHeaderIcons();  // Optional: Update header icons to show ascending/descending arrows
     }
 
-    // Method to update table header icons based on sorting order
+ // Method to update table header icons based on sorting order
     private void updateTableHeaderIcons() {
         JTableHeader header = table.getTableHeader();
         TableColumnModel columnModel = header.getColumnModel();
@@ -161,9 +210,8 @@ public class BookstoreInventory extends JFrame {
             columnModel.getColumn(i).setHeaderValue(columnName + icon);
         }
 
-        header.repaint();  // Repaint the header to show updated icons
+        header.repaint(); // Repaint the header to show updated icons
     }
-
     // Method to add a new book to the inventory
     private void addBook() {
         String title = JOptionPane.showInputDialog(this, "Enter book title:");
@@ -180,7 +228,7 @@ public class BookstoreInventory extends JFrame {
 
         // Check if the book already exists
         if (books.toList().stream().anyMatch(b -> b.getTitle().equalsIgnoreCase(title) && b.getAuthor().equalsIgnoreCase(author))) {
-            JOptionPane.showMessageDialog(this, "This book with the same title and author already exists.");
+            JOptionPane.showMessageDialog(this, "This book with the same title and author already exists or discontinued");
             return;
         }
 
@@ -208,8 +256,8 @@ public class BookstoreInventory extends JFrame {
             }
         }
 
-        books.add(new Book(title, author, price, stock));  // Add the new book to the list
-        refreshTable();  // Refresh the table to show the updated list
+        books.add(new Book(title, author, price, stock)); // Add the new book to the list
+        refreshTable(); // Refresh the table to show the updated list
     }
 
     // Method to search for a book by title or author
@@ -227,7 +275,7 @@ public class BookstoreInventory extends JFrame {
         if (filteredBooks.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Book not found.");
         } else {
-            updateTable(filteredBooks);  // Update the table to show the search results
+            updateTable(filteredBooks); // Update the table to show the search results
         }
     }
 
@@ -253,15 +301,14 @@ public class BookstoreInventory extends JFrame {
         }
     }
 
-
     // Method to mark a book as discontinued
     private void markAsDiscontinued() {
         String title = JOptionPane.showInputDialog(this, "Enter book title to mark as discontinued:");
         Book book = books.find(title);
 
         if (book != null) {
-            book.setDiscontinued(true);  // Mark the book as discontinued
-            refreshTable();  // Refresh the table to show the updated status
+            book.setDiscontinued(true); // Mark the book as discontinued
+            refreshTable(); // Refresh the table to show the updated status
         } else {
             JOptionPane.showMessageDialog(this, "Book not found!");
         }
@@ -272,20 +319,56 @@ public class BookstoreInventory extends JFrame {
         List<Book> activeBooks = books.toList().stream()
                 .filter(book -> !book.isDiscontinued())
                 .collect(Collectors.toList());
-        updateTable(activeBooks);  // Update the table with active books
+        updateTable(activeBooks); // Update the table with active books
     }
 
     // Method to update the table with a list of books
     private void updateTable(List<Book> books) {
-        model.setRowCount(0);  // Clear the table
+        model.setRowCount(0); // Clear the table
         for (Book book : books) {
             model.addRow(new Object[]{book.getTitle(), book.getAuthor(), String.format("%.2f", book.getPrice()), book.getStock()});
         }
     }
+    private void resetInventory() {
+        int response = JOptionPane.showConfirmDialog(this, "Are you sure you want to reset the inventory?", 
+                                                     "Confirm Reset", JOptionPane.YES_NO_OPTION);
+        if (response == JOptionPane.YES_OPTION) {
+            // Clear the books list
+            books.clear();
 
-    // Main method to run the bookstore inventory application
-    public static void main(String[] args) {
-        new BookstoreInventory().setVisible(true);  // Create and display the application
+            // Delete or reset the JSON file
+            File file = new File(FILE_NAME);
+            if (file.exists()) {
+                file.delete();  // Delete the file or reset its content
+            }
+
+            // Save an empty list to the file
+            saveBooksToFile();
+
+            // Refresh the table
+            refreshTable();
+        }
     }
-}
 
+
+    public static void main(String[] args) {
+        // Show the loading screen first
+        LoadingScreen loadingScreen = new LoadingScreen();  // Show the loading screen
+
+        // Create a thread to simulate loading and ensure the loading screen stays visible
+        new Thread(() -> {
+            try {
+                // Simulate a loading delay (adjust as necessary)
+                Thread.sleep(3000);  // Show the loading screen for 3 seconds
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            // After loading, dispose of the loading screen and open the main window
+            loadingScreen.dispose();  // Close the loading screen
+            SwingUtilities.invokeLater(() -> new BookstoreInventory().setVisible(true));  // Open the main window
+        }).start();
+    }
+
+
+}
